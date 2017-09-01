@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>Document</title>
+</head>
+<body>
+	<button id="error">点击报错</button>
+	<button id="error1">点击报错1</button>
+	<script src="http://cdn.bootcss.com/jquery/2.2.3/jquery.slim.js"></script>
+	<script src="dist/hunter.js"></script>
+	<script>
+		var error_report = new hunter({
+		    url: 'http://lxh.error.brandwisdom.cn/error.gif?',
+		    repeat:5,
+		    delay: 3000
+		});
+		$('#error').click(function() {
+			console.log(aaa)
+		})
+		$('#error1').click(function() {
+			console.log(bbbb)
+		})
+	</script>
+</body>
+</html>
