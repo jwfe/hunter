@@ -12,6 +12,7 @@ let Report = (supperclass) => class extends supperclass {
         });
 	}
 	request( url, cb ) {
+        url = url.slice(0, 8180);
         let img = new window.Image();
         img.onload = cb;
         img.src = url;
@@ -57,12 +58,14 @@ let Report = (supperclass) => class extends supperclass {
 
     }
 	//手动上报
-	handle (msg, type, level) {
+	handle (msg, cause, level) {
         let key = this.config.localKey;
 		let errorMsg = {
-		    msg: msg,
+		    msg: msg.message + msg.stack,
+            cause: cause, //angular中捕获错误的cause信息
 		    level: level
 		};
+
         errorMsg = utils.assignObject( utils.getSystemInfo(), errorMsg );
 		if ( this.catchError( errorMsg ) ) {
 		    this.send(() => {

@@ -309,6 +309,7 @@ var Report$1 = function Report(supperclass) {
         createClass(_class, [{
             key: 'request',
             value: function request(url, cb) {
+                url = url.slice(0, 8180);
                 var img = new window.Image();
                 img.onload = cb;
                 img.src = url;
