@@ -186,7 +186,7 @@ var Config = function () {
 
 		this.config = {
 			localKey: 'hunter',
-			url: 'http://lxh.error.brandwisdom.cn/error.gif?', //上报错误地址
+			url: 'http://192.168.19.201:9050/api/error.gif?', //上报错误地址
 			delay: 3000, //延迟上报时间
 			repeat: 5 //重复五次不上报
 		};
@@ -273,6 +273,7 @@ var Storage$1 = function Storage(supperclass) {
         }, {
             key: "setItem",
             value: function setItem(errorObj) {
+                console.log(errorObj, 'error****');
                 var _config = this.config;
                 store.setItem(this.config.localKey, errorObj);
                 return utils.stringify(errorObj);
@@ -300,7 +301,7 @@ var Report$1 = function Report(supperclass) {
             _this.repeatList = {};
             ['warn', 'error'].forEach(function (type, index) {
                 _this[type] = function (msg) {
-                    return _this.handle(msg, type, index);
+                    return _this.handle(msg, index);
                 };
             });
             return _this;
@@ -327,6 +328,7 @@ var Report$1 = function Report(supperclass) {
                 url += parames;
                 this.request(url, function () {
                     if (cb) {
+                        console.log(123456);
                         cb.call(_this2);
                     }
                 });
@@ -372,7 +374,7 @@ var Report$1 = function Report(supperclass) {
 
         }, {
             key: 'handle',
-            value: function handle(msg, type, level) {
+            value: function handle(msg, level) {
                 var _this4 = this;
 
                 var key = this.config.localKey;
@@ -380,9 +382,11 @@ var Report$1 = function Report(supperclass) {
                     msg: msg,
                     level: level
                 };
+                console.log(errorMsg, 'select-error');
                 errorMsg = utils.assignObject(utils.getSystemInfo(), errorMsg);
                 if (this.catchError(errorMsg)) {
                     this.send(function () {
+                        console.log('success');
                         _this4.clear(key);
                     });
                 }

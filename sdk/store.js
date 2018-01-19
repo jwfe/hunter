@@ -47,6 +47,7 @@ const Storage = (supperclass) => class extends supperclass {
     }
     // 设置一条localstorage或cookie
     setItem( errorObj ) {
+        console.log(errorObj, 'error****')
         let _config = this.config;
         store.setItem( this.config.localKey, errorObj );
         return utils.stringify( errorObj );

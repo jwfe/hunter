@@ -7,7 +7,7 @@ let Report = (supperclass) => class extends supperclass {
         this.repeatList = {};
         [ 'warn', 'error' ].forEach( ( type, index ) => {
             this[ type ] = ( msg ) => {
-                return this.handle( msg, type, index );
+                return this.handle( msg, index );
             };
         });
 	}
@@ -26,6 +26,7 @@ let Report = (supperclass) => class extends supperclass {
         url += parames;
         this.request( url, () => {
             if ( cb ) {
+                console.log(123456)
                 cb.call( this );
             }
         } );
@@ -58,17 +59,17 @@ let Report = (supperclass) => class extends supperclass {
 
     }
 	//手动上报
-	handle (msg, cause, level) {
+	handle (msg, level) {
         let key = this.config.localKey;
 		let errorMsg = {
-		    msg: msg.message + msg.stack,
-            cause: cause, //angular中捕获错误的cause信息
+		    msg: msg,
 		    level: level
 		};
-
+        console.log(errorMsg, 'select-error')
         errorMsg = utils.assignObject( utils.getSystemInfo(), errorMsg );
 		if ( this.catchError( errorMsg ) ) {
 		    this.send(() => {
+                console.log('success')
                 this.clear(key)
             });
 		}

@@ -6,7 +6,7 @@ class Config  {
 	constructor(options) {
 		this.config = {
 			localKey: 'hunter',
-			url: 'http://lxh.error.brandwisdom.cn/error.gif?', //上报错误地址
+			url: 'http://192.168.19.201:9050/api/error.gif?', //上报错误地址
 			delay: 3000, //延迟上报时间
 			repeat: 5 //重复五次不上报
 		}
