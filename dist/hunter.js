@@ -166,12 +166,84 @@ var utils = {
         var parames = '';
         Object.keys(obj).forEach(function (name) {
             if (utils.typeDecide(obj[name], 'Object')) {
-                parames += utils.stringify(obj[name]);
+                parames += utils.stringify(obj[name]) + ',';
             } else {
-                parames += obj[name];
+                parames += obj[name] + ',';
             }
         });
         return encodeURIComponent(parames);
+    },
+    getErrorInfo: function getErrorInfo(ex) {
+        if (typeof ex.stack === 'undefined' || !ex.stack) {
+            return {
+
+                'msg': ex.name + ':' + ex.message,
+                'level': 4
+            };
+        } else {
+            var chrome = /^\s*at (.*?) ?\(((?:file|https?|blob|chrome-extension|native|eval|webpack|<anonymous>|\/).*?)(?::(\d+))?(?::(\d+))?\)?\s*$/i,
+                gecko = /^\s*(.*?)(?:\((.*?)\))?(?:^|@)((?:file|https?|blob|chrome|webpack|resource|\[native).*?|[^@]*bundle)(?::(\d+))?(?::(\d+))?\s*$/i,
+                winjs = /^\s*at (?:((?:\[object object\])?.+) )?\(?((?:file|ms-appx|https?|webpack|blob):.*?):(\d+)(?::(\d+))?\)?\s*$/i,
+
+
+            // Used to additionally parse URL/line/column from eval frames
+            geckoEval = /(\S+) line (\d+)(?: > eval line \d+)* > eval/i,
+                chromeEval = /\((\S*)(?::(\d+))(?::(\d+))\)/,
+                lines = ex.stack.split('\n'),
+                stack = [],
+                submatch,
+                parts,
+                element,
+                reference = /^(.*) is undefined$/.exec(ex.message);
+            if (parts = chrome.exec(lines[1])) {
+                var isNative = parts[2] && parts[2].indexOf('native') === 0; // start of line
+                var isEval = parts[2] && parts[2].indexOf('eval') === 0; // start of line
+                if (isEval && (submatch = chromeEval.exec(parts[2]))) {
+                    // throw out eval line/column and use top-most line/column number
+                    parts[2] = submatch[1]; // url
+                    parts[3] = submatch[2]; // line
+                    parts[4] = submatch[3]; // column
+                }
+                element = {
+                    'url': !isNative ? parts[2] : null,
+                    'line': parts[3] ? +parts[3] : null,
+                    'column': parts[4] ? +parts[4] : null
+                };
+            } else if (parts = winjs.exec(lines[1])) {
+                element = {
+                    'url': parts[2],
+                    'line': +parts[3],
+                    'column': parts[4] ? +parts[4] : null
+                };
+            } else if (parts = gecko.exec(lines[1])) {
+                var isEval = parts[3] && parts[3].indexOf(' > eval') > -1;
+                if (isEval && (submatch = geckoEval.exec(parts[3]))) {
+                    // throw out eval line/column and use top-most line number
+                    parts[3] = submatch[1];
+                    parts[4] = submatch[2];
+                    parts[5] = null; // no column when eval
+                } else if (i === 0 && !parts[5] && typeof ex.columnNumber !== 'undefined') {
+                    // FireFox uses this awesome columnNumber property for its top frame
+                    // Also note, Firefox's column number is 0-based and everything else expects 1-based,
+                    // so adding 1
+                    // NOTE: this hack doesn't work if top-most frame is eval
+                    stack[0].column = ex.columnNumber + 1;
+                }
+                element = {
+                    'url': parts[3],
+                    'line': parts[4] ? +parts[4] : null,
+                    'column': parts[5] ? +parts[5] : null
+                };
+            }
+
+            return {
+                'msg': ex.name + ':' + ex.message,
+                'rowNum': element.line,
+                'colNum': element.column,
+                'targetUrl': element.url,
+                'level': 4
+            };
+        }
     },
     //空回调
     noop: function noop() {}
@@ -186,9 +258,11 @@ var Config = function () {
 
 		this.config = {
 			localKey: 'hunter',
-			url: 'http://192.168.19.201:9050/api/error.gif?', //上报错误地址
+			url: 'http://192.168.19.201:9050/api/error.gif', //上报错误地址
+			except: [/^Script error\.?/, /^Javascript error: Script error\.? on line 0/], // 忽略某个错误
 			delay: 3000, //延迟上报时间
-			repeat: 5 //重复五次不上报
+			repeat: 5, //重复五次不上报
+			validTime: 7 //localstorage过期时间
 		};
 		this.config = utils.assignObject(this.config, options);
 	}
@@ -223,12 +297,18 @@ var store = {
         };
         return ['msg', 'colNum', 'rowNum'].filter(getDetail).map(getDetail).join('@');
     },
-    getInfo: function getInfo(key, errorObj) {
+    //设置失效时间
+    getEpires: function getEpires(validTime) {
+        return +new Date() + 1000 * 60 * 60 * 24 * validTime;
+    },
+    getInfo: function getInfo(key, errorObj, validTime) {
         var source = store.getItem(key);
+
         if (errorObj) {
-            var name = store.getKey(errorObj.msg);
+            var name = store.getKey(errorObj);
             source[name] = {
-                value: errorObj
+                value: errorObj,
+                expiresTime: store.getEpires(validTime)
             };
         }
         return utils.stringify(source);
@@ -273,9 +353,8 @@ var Storage$1 = function Storage(supperclass) {
         }, {
             key: "setItem",
             value: function setItem(errorObj) {
-                console.log(errorObj, 'error****');
                 var _config = this.config;
-                store.setItem(this.config.localKey, errorObj);
+                store.setItem(_config.localKey, errorObj, _config.validTime);
                 return utils.stringify(errorObj);
             }
         }, {
@@ -299,6 +378,7 @@ var Report$1 = function Report(supperclass) {
 
             _this.errorQueue = [];
             _this.repeatList = {};
+            _this.url = _this.config.url + '?err_msg=';
             ['warn', 'error'].forEach(function (type, index) {
                 _this[type] = function (msg) {
                     return _this.handle(msg, index);
@@ -310,7 +390,6 @@ var Report$1 = function Report(supperclass) {
         createClass(_class, [{
             key: 'request',
             value: function request(url, cb) {
-                url = url.slice(0, 8180);
                 var img = new window.Image();
                 img.onload = cb;
                 img.src = url;
@@ -320,19 +399,18 @@ var Report$1 = function Report(supperclass) {
             value: function report(cb) {
                 var _this2 = this;
 
-                var url = this.config.url;
-                var key = this.config.localKey;
-                var curQueue = this.getItem(key);
+                var curQueue = this.errorQueue;
                 // 合并上报
-                var parames = utils.serializeObj(curQueue);
-                url += parames;
+                var parames = curQueue.map(function (obj) {
+                    _this2.setItem(obj);
+                    return utils.serializeObj(obj);
+                }).join('|');
+                var url = this.url + parames;
                 this.request(url, function () {
                     if (cb) {
-                        console.log(123456);
                         cb.call(_this2);
                     }
                 });
-
                 return url;
             }
             //重复错误不收集
@@ -346,16 +424,38 @@ var Report$1 = function Report(supperclass) {
                 this.repeatList[repeatName] = this.repeatList[repeatName] ? this.repeatList[repeatName] + 1 : 1;
                 return this.repeatList[repeatName] > this.config.repeat;
             }
-            //收集错误到localstorage
+            // push错误到pool
 
         }, {
             key: 'catchError',
-            value: function catchError(err) {
-                this.setItem(err);
-                if (this.repeat(err)) {
+            value: function catchError(error) {
+                if (this.repeat(error)) {
                     return false;
                 }
-                return true;
+                if (this.except(error)) {
+                    return false;
+                }
+                this.errorQueue.push(error);
+                return this.errorQueue;
+            }
+            //忽略错误
+
+        }, {
+            key: 'except',
+            value: function except(error) {
+                var oExcept = this.config.except;
+                var result = false;
+                var v = null;
+                if (utils.typeDecide(oExcept, "Array")) {
+                    for (var i = 0, len = oExcept.length; i < len; i++) {
+                        v = oExcept[i];
+                        if (utils.typeDecide(v, "RegExp") && v.test(error.msg) || utils.typeDecide(v, "Function") && v(error, error.msg)) {
+                            result = true;
+                            break;
+                        }
+                    }
+                }
+                return result;
             }
             // 发送
 
@@ -375,20 +475,29 @@ var Report$1 = function Report(supperclass) {
         }, {
             key: 'handle',
             value: function handle(msg, level) {
-                var _this4 = this;
+                if (!msg) {
+                    return false;
+                }
+                if (utils.typeDecide(msg, 'Object') && !msg.msg) {
+                    return false;
+                }
 
-                var key = this.config.localKey;
-                var errorMsg = {
+                if (utils.typeDecide(msg, 'Error')) {
+                    msg = {
+                        msg: msg.message,
+                        ext: {
+                            stack: msg.stack
+                        }
+                    };
+                }
+
+                var errorMsg = utils.typeDecide(msg, 'Object') ? msg : {
                     msg: msg,
                     level: level
                 };
-                console.log(errorMsg, 'select-error');
                 errorMsg = utils.assignObject(utils.getSystemInfo(), errorMsg);
                 if (this.catchError(errorMsg)) {
-                    this.send(function () {
-                        console.log('success');
-                        _this4.clear(key);
-                    });
+                    this.send();
                 }
                 return errorMsg;
             }
@@ -405,7 +514,46 @@ var hunter = function (_report) {
 
 		var _this = possibleConstructorReturn(this, (hunter.__proto__ || Object.getPrototypeOf(hunter)).call(this, options));
 
+		_this._storeClcikedDom = function (ele) {
+			var target = ele.target ? ele.target : ele.srcElement;
+			var info = {
+				time: new Date().getTime()
+			};
+			if (target) {
+				// 只保存存在的属性
+				target.tagName && (info.tagName = target.tagName);
+				target.id && (info.id = target.id);
+				target.className && (info.className = target.className);
+				target.name && (info.name = target.name);
+				// 不存在id时，遍历父元素
+				if (!target.id) {
+					// 遍历三层父元素
+					var i = 0,
+					    parent = target;
+					while (i++ < 3 && parent.parentNode) {
+						if (!parent.parentNode.outerHTML) break;
+						parent = parent.parentNode;
+						if (parent.id) break;
+					}
+					// 如果父元素中有id，则只保存id，保存规则为 父元素层级:id
+					if (parent.id) {
+						info.parentId = i + ':' + parent.id;
+					} else {
+						// 父元素没有id，则保存outerHTML
+						var outerHTML = parent.outerHTML.replace(/>\s+</g, '><'); // 去除空白字符
+						outerHTML && outerHTML.length > 200 && (outerHTML = outerHTML.slice(0, 200));
+						info.outerHTML = outerHTML;
+					}
+				}
+			}
+			_this.breadcrumbs.push(info);
+			_this.breadcrumbs.length > 10 && _this.breadcrumbs.shift();
+		};
+
+		_this.breadcrumbs = [];
 		_this.rewriteError();
+		_this.rewritePromiseError();
+		_this.catchClickQueue();
 		return _this;
 	}
 
@@ -419,26 +567,12 @@ var hunter = function (_report) {
 			window.onerror = function (msg, url, line, col, error) {
 				//有些浏览器没有col
 				col = col || window.event && window.event.errorCharacter || 0;
+
 				var reportMsg = msg;
 				if (error && error.stack) {
 					reportMsg = _this2.handleErrorStack(error);
 				} else {
-					//不存stack的话，对reportMsg做下处理 
-					var ext = [];
-					var f = _arguments.callee.caller,
-					    // jshint ignore:line
-					c = 3;
-					//这里只拿三层堆栈信息
-					while (f && --c > 0) {
-						ext.push(f.toString());
-						if (f === f.caller) {
-							break; //如果有环
-						}
-						f = f.caller;
-					}
-					if (ext.length > 0) {
-						reportMsg += '@' + ext.join(',');
-					}
+					reportMsg = _this2._fixMsgByCaller(reportMsg, _arguments.callee.caller); // jshint ignore:line
 				}
 				if (utils.typeDecide(reportMsg, "Event")) {
 					reportMsg += reportMsg.type ? "--" + reportMsg.type + "--" + (reportMsg.target ? reportMsg.target.tagName + "::" + reportMsg.target.src : "") : "";
@@ -448,11 +582,87 @@ var hunter = function (_report) {
 						msg: reportMsg,
 						rowNum: line,
 						colNum: col,
-						targetUrl: url
+						targetUrl: url,
+						level: 1,
+						breadcrumbs: JSON.stringify(_this2.breadcrumbs)
 					});
 				}
 				defaultOnerror.call(null, msg, url, line, col, error);
 			};
+		}
+	}, {
+		key: 'rewritePromiseError',
+		value: function rewritePromiseError() {
+			var _this3 = this,
+			    _arguments2 = arguments;
+
+			var defaultUnhandledRejection = window.onunhandledrejection || utils.noop;
+			window.onunhandledrejection = function (error) {
+				if (!_this3.trigger('error', utils.toArray(_arguments2))) {
+					return false;
+				}
+
+				var msg = error.reason && error.reason.message || '';
+				var stackObj = {};
+				if (error.reason && error.reason.stack) {
+					msg = _this3.handleErrorStack(error.reason);
+					stackObj = _this3._parseErrorStack(error.reason.stack);
+				} else {
+					msg = _this3._fixMsgByCaller(msg, _arguments2.callee.caller); // jshint ignore:line
+				}
+				if (msg) {
+					_this3.error({
+						msg: msg,
+						rowNum: stackObj.line || 0,
+						colNum: stackObj.col || 0,
+						targetUrl: stackObj.targetUrl || '',
+						level: 4,
+						breadcrumbs: JSON.stringify(_this3.breadcrumbs)
+					});
+				}
+				defaultUnhandledRejection.call(null, error);
+			};
+		}
+		//不存在stack的话，取调用栈信息
+
+	}, {
+		key: '_fixMsgByCaller',
+		value: function _fixMsgByCaller(msg, caller) {
+			var ext = [];
+			var f = caller,
+			    c = 3;
+			//这里只拿三层堆栈信息
+			while (f && c-- > 0) {
+				ext.push(f.toString());
+				if (f === f.caller) {
+					break; //如果有环
+				}
+				f = f.caller;
+			}
+			if (ext.length > 0) {
+				msg += '@' + ext.join(',');
+			}
+			return msg;
+		}
+		// 从报错信息中获取行号、列号、url
+
+	}, {
+		key: '_parseErrorStack',
+		value: function _parseErrorStack(stack) {
+			var stackObj = {};
+			var stackArr = stack.split('at');
+			// 只取第一个堆栈信息，获取包含url、line、col的部分，如果有括号，去除最后的括号
+			var info = stackArr[1].match(/http.*/)[0].replace(/\)$/, '');
+			// 以冒号拆分
+			var errorInfoArr = info.split(':');
+			var len = errorInfoArr.length;
+			// 行号、列号在最后位置
+			stackObj.col = errorInfoArr[len - 1];
+			stackObj.line = errorInfoArr[len - 2];
+			// 删除最后两个（行号、列号）
+			errorInfoArr.splice(len - 2, 2);
+			stackObj.targetUrl = errorInfoArr.join(':');
+			return stackObj;
 		}
 		// 处理onerror返回的error.stack
 
@@ -469,6 +679,19 @@ var hunter = function (_report) {
 				stackMsg = '';
 			}
 			return stackMsg;
+		}
+	}, {
+		key: 'catchClickQueue',
+		value: function catchClickQueue() {
+			if (window.addEventListener) {
+				if ('ontouchstart' in document.documentElement) {
+					window.addEventListener('touchstart', this._storeClcikedDom, !0);
+				} else {
+					window.addEventListener('click', this._storeClcikedDom, !0);
+				}
+			} else {
+				document.attachEvent("onclick", this._storeClcikedDom);
+			}
 		}
 	}]);
 	return hunter;

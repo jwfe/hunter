@@ -15,12 +15,18 @@ const store = {
         }
         return [ 'msg', 'colNum', 'rowNum' ].filter( getDetail ).map( getDetail ).join( '@' ); 
     },
-    getInfo: (key, errorObj) => {
+    //设置失效时间
+    getEpires: function ( validTime ) {
+        return +new Date() + ( 1000 * 60 * 60 * 24 * validTime );
+    },
+    getInfo: (key, errorObj, validTime) => {
         let source = store.getItem(key);
+        
         if ( errorObj ) {
-            let name = store.getKey( errorObj.msg );
+            let name = store.getKey( errorObj );
             source[ name ] = {
-                value: errorObj
+                value: errorObj,
+                expiresTime: store.getEpires( validTime ),
             };
         }
         return utils.stringify( source );
@@ -47,9 +53,8 @@ const Storage = (supperclass) => class extends supperclass {
     }
     // 设置一条localstorage或cookie
     setItem( errorObj ) {
-        console.log(errorObj, 'error****')
         let _config = this.config;
-        store.setItem( this.config.localKey, errorObj );
+        store.setItem( _config.localKey, errorObj,  _config.validTime );
         return utils.stringify( errorObj );
     }
     clear( key ) {

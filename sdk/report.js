@@ -5,6 +5,7 @@ let Report = (supperclass) => class extends supperclass {
 		super( options );
         this.errorQueue = [];
         this.repeatList = {};
+        this.url = this.config.url + '?err_msg=';
         [ 'warn', 'error' ].forEach( ( type, index ) => {
             this[ type ] = ( msg ) => {
                 return this.handle( msg, index );
@@ -12,25 +13,23 @@ let Report = (supperclass) => class extends supperclass {
         });
 	}
 	request( url, cb ) {
-        url = url.slice(0, 8180);
         let img = new window.Image();
         img.onload = cb;
         img.src = url;
     }
     report( cb ) {
-        let url = this.config.url;
-        let key = this.config.localKey;
-        let curQueue = this.getItem(key);
+        let curQueue = this.errorQueue;
         // 合并上报
-        let parames = utils.serializeObj(curQueue);
-        url += parames;
+        let parames = curQueue.map( obj => {
+            this.setItem( obj );
+            return utils.serializeObj( obj );
+        } ).join( '|' );
+        let url = this.url + parames;
         this.request( url, () => {
             if ( cb ) {
-                console.log(123456)
                 cb.call( this );
             }
         } );
-
         return url;
     }
 	//重复错误不收集
@@ -41,14 +40,35 @@ let Report = (supperclass) => class extends supperclass {
         this.repeatList[ repeatName ] = this.repeatList[ repeatName ] ? this.repeatList[ repeatName ] + 1 : 1;
         return this.repeatList[ repeatName ] > this.config.repeat;
     }
-	//收集错误到localstorage
-	catchError (err) {
-        this.setItem(err)
-		if(this.repeat(err)) {
-			return false;
-		}
-        return true;
-	}
+	// push错误到pool
+    catchError( error ) {
+        if ( this.repeat( error ) ) {
+            return false;
+        }
+        if ( this.except( error ) ) {
+            return false;
+        }
+        this.errorQueue.push( error );
+        return this.errorQueue;
+    }
+    //忽略错误
+    except( error ) {
+        let oExcept = this.config.except;
+        let result = false;
+        let v = null;
+        if ( utils.typeDecide( oExcept, "Array" ) ) {
+            for ( let i = 0, len = oExcept.length; i < len; i++ ) {
+                v = oExcept[ i ];
+                if ( ( utils.typeDecide( v, "RegExp" ) && v.test( error.msg ) ) ||
+                    ( utils.typeDecide( v, "Function" ) && v( error, error.msg ) ) ) {
+                    result = true;
+                    break;
+                }
+            }
+        }
+        return result;
+
+    }
 	// 发送
     send( cb ) {
         let callback = cb || utils.noop;
@@ -60,20 +80,31 @@ let Report = (supperclass) => class extends supperclass {
     }
 	//手动上报
 	handle (msg, level) {
-        let key = this.config.localKey;
-		let errorMsg = {
-		    msg: msg,
-		    level: level
-		};
-        console.log(errorMsg, 'select-error')
+         if ( !msg ) {
+            return false;
+        }
+        if( utils.typeDecide( msg, 'Object' ) && !msg.msg ){
+            return false;
+        }
+
+        if ( utils.typeDecide( msg, 'Error' ) ) {
+            msg = {
+                msg: msg.message,
+                ext: {
+                    stack: msg.stack
+                }
+            };
+        }
+
+        let errorMsg = utils.typeDecide( msg, 'Object' ) ? msg : {
+            msg: msg,
+            level: level
+        };
         errorMsg = utils.assignObject( utils.getSystemInfo(), errorMsg );
-		if ( this.catchError( errorMsg ) ) {
-		    this.send(() => {
-                console.log('success')
-                this.clear(key)
-            });
-		}
-		return errorMsg;
+        if ( this.catchError( errorMsg ) ) {
+            this.send();
+        }
+        return errorMsg;
 	}
 }
 export default Report;
