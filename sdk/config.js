@@ -9,7 +9,7 @@ class Config  {
 			url: 'http://192.168.19.201:9050/api/error.gif', //上报错误地址
 			except: [ /^Script error\.?/, /^Javascript error: Script error\.? on line 0/ ], // 忽略某个错误
 			delay: 3000, //延迟上报时间
-			repeat: 5, //重复五次不上报
+			repeat: 1, //重复2次不上报
 			validTime: 7 //localstorage过期时间
 		}
 		this.config = utils.assignObject( this.config, options );

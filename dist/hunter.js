@@ -145,15 +145,12 @@ var utils = {
     getSystemInfo: function getSystemInfo() {
         var scr = window.screen;
         return {
-            userAgent: window.navigator.userAgent,
-            currentUrl: window.location.href,
-            timestamp: +new Date() + Math.random(),
+            timestamp: +new Date(),
             projectType: utils.getPlatType(),
             title: document.title,
             screenSize: scr.width + "x" + scr.height,
             referer: document.referrer ? document.referrer.toLowerCase() : '',
-            host: window.location.protocol + '//' + window.location.hostname,
-            env: window.location.hostname.split('.')[0]
+            project_id: window.projectId
         };
     },
     typeDecide: function typeDecide(o, type) {
@@ -166,84 +163,12 @@ var utils = {
         var parames = '';
         Object.keys(obj).forEach(function (name) {
             if (utils.typeDecide(obj[name], 'Object')) {
-                parames += utils.stringify(obj[name]) + ',';
+                parames += name + '=' + utils.stringify(obj[name]);
             } else {
-                parames += obj[name] + ',';
+                parames += name + '=' + obj[name] + '^';
             }
         });
-        return encodeURIComponent(parames);
-    },
-    getErrorInfo: function getErrorInfo(ex) {
-        if (typeof ex.stack === 'undefined' || !ex.stack) {
-            return {
-
-                'msg': ex.name + ':' + ex.message,
-                'level': 4
-            };
-        } else {
-            var chrome = /^\s*at (.*?) ?\(((?:file|https?|blob|chrome-extension|native|eval|webpack|<anonymous>|\/).*?)(?::(\d+))?(?::(\d+))?\)?\s*$/i,
-                gecko = /^\s*(.*?)(?:\((.*?)\))?(?:^|@)((?:file|https?|blob|chrome|webpack|resource|\[native).*?|[^@]*bundle)(?::(\d+))?(?::(\d+))?\s*$/i,
-                winjs = /^\s*at (?:((?:\[object object\])?.+) )?\(?((?:file|ms-appx|https?|webpack|blob):.*?):(\d+)(?::(\d+))?\)?\s*$/i,
-
-
-            // Used to additionally parse URL/line/column from eval frames
-            geckoEval = /(\S+) line (\d+)(?: > eval line \d+)* > eval/i,
-                chromeEval = /\((\S*)(?::(\d+))(?::(\d+))\)/,
-                lines = ex.stack.split('\n'),
-                stack = [],
-                submatch,
-                parts,
-                element,
-                reference = /^(.*) is undefined$/.exec(ex.message);
-            if (parts = chrome.exec(lines[1])) {
-                var isNative = parts[2] && parts[2].indexOf('native') === 0; // start of line
-                var isEval = parts[2] && parts[2].indexOf('eval') === 0; // start of line
-                if (isEval && (submatch = chromeEval.exec(parts[2]))) {
-                    // throw out eval line/column and use top-most line/column number
-                    parts[2] = submatch[1]; // url
-                    parts[3] = submatch[2]; // line
-                    parts[4] = submatch[3]; // column
-                }
-                element = {
-                    'url': !isNative ? parts[2] : null,
-                    'line': parts[3] ? +parts[3] : null,
-                    'column': parts[4] ? +parts[4] : null
-                };
-            } else if (parts = winjs.exec(lines[1])) {
-                element = {
-                    'url': parts[2],
-                    'line': +parts[3],
-                    'column': parts[4] ? +parts[4] : null
-                };
-            } else if (parts = gecko.exec(lines[1])) {
-                var isEval = parts[3] && parts[3].indexOf(' > eval') > -1;
-                if (isEval && (submatch = geckoEval.exec(parts[3]))) {
-                    // throw out eval line/column and use top-most line number
-                    parts[3] = submatch[1];
-                    parts[4] = submatch[2];
-                    parts[5] = null; // no column when eval
-                } else if (i === 0 && !parts[5] && typeof ex.columnNumber !== 'undefined') {
-                    // FireFox uses this awesome columnNumber property for its top frame
-                    // Also note, Firefox's column number is 0-based and everything else expects 1-based,
-                    // so adding 1
-                    // NOTE: this hack doesn't work if top-most frame is eval
-                    stack[0].column = ex.columnNumber + 1;
-                }
-                element = {
-                    'url': parts[3],
-                    'line': parts[4] ? +parts[4] : null,
-                    'column': parts[5] ? +parts[5] : null
-                };
-            }
-
-            return {
-                'msg': ex.name + ':' + ex.message,
-                'rowNum': element.line,
-                'colNum': element.column,
-                'targetUrl': element.url,
-                'level': 4
-            };
-        }
+        return encodeURIComponent(parames.substr(0, parames.length - 1));
     },
     //空回调
     noop: function noop() {}
@@ -261,7 +186,7 @@ var Config = function () {
 			url: 'http://192.168.19.201:9050/api/error.gif', //上报错误地址
 			except: [/^Script error\.?/, /^Javascript error: Script error\.? on line 0/], // 忽略某个错误
 			delay: 3000, //延迟上报时间
-			repeat: 5, //重复五次不上报
+			repeat: 1, //重复2次不上报
 			validTime: 7 //localstorage过期时间
 		};
 		this.config = utils.assignObject(this.config, options);
@@ -307,7 +232,7 @@ var store = {
         if (errorObj) {
             var name = store.getKey(errorObj);
             source[name] = {
-                value: errorObj,
+                value: errorObj.msg,
                 expiresTime: store.getEpires(validTime)
             };
         }
@@ -362,6 +287,27 @@ var Storage$1 = function Storage(supperclass) {
             value: function clear(key) {
                 store.clear(key);
             }
+            //过期key删除
+
+        }, {
+            key: "removeEpires",
+            value: function removeEpires() {
+                var _config = this.config;
+
+                var oData = store.getItem(_config.localKey) || {};
+
+                var date = +new Date();
+                for (var key in oData) {
+                    if (oData[key].expiresTime <= date) {
+                        delete oData[key];
+                    }
+                }
+                this.clear(_config.localKey);
+
+                for (var newkey in oData) {
+                    store.setItem(_config.localKey, { msg: oData[newkey].value }, _config.validTime);
+                }
+            }
         }]);
         return _class;
     }(supperclass);
@@ -403,13 +349,16 @@ var Report$1 = function Report(supperclass) {
                 // 合并上报
                 var parames = curQueue.map(function (obj) {
                     _this2.setItem(obj);
-                    return utils.serializeObj(obj);
+                    return utils.stringify(obj);
                 }).join('|');
+                console.log(parames);
                 var url = this.url + parames;
                 this.request(url, function () {
-                    if (cb) {
-                        cb.call(_this2);
-                    }
+                    console.log(_this2.errorQueue, 'queue');
+                    _this2.removeEpires();
+                    // if ( cb ) {
+                    //     cb.call( this );
+                    // }
                 });
                 return url;
             }
@@ -421,7 +370,10 @@ var Report$1 = function Report(supperclass) {
                 var rowNum = error.rowNum || '';
                 var colNum = error.colNum || '';
                 var repeatName = error.msg + rowNum + colNum;
+                //let allError = this.getItem(this.config.localKey);
                 this.repeatList[repeatName] = this.repeatList[repeatName] ? this.repeatList[repeatName] + 1 : 1;
+                console.log(this.repeatList[repeatName], 'list');
+                console.log(this.config.repeat, 'repeat');
                 return this.repeatList[repeatName] > this.config.repeat;
             }
             // push错误到pool
@@ -496,6 +448,7 @@ var Report$1 = function Report(supperclass) {
                     level: level
                 };
                 errorMsg = utils.assignObject(utils.getSystemInfo(), errorMsg);
+
                 if (this.catchError(errorMsg)) {
                     this.send();
                 }
@@ -572,7 +525,7 @@ var hunter = function (_report) {
 				if (error && error.stack) {
 					reportMsg = _this2.handleErrorStack(error);
 				} else {
-					reportMsg = _this2._fixMsgByCaller(reportMsg, _arguments.callee.caller); // jshint ignore:line
+					reportMsg = _this2._fixMsgByCaller(reportMsg, _arguments.callee.caller);
 				}
 				if (utils.typeDecide(reportMsg, "Event")) {
 					reportMsg += reportMsg.type ? "--" + reportMsg.type + "--" + (reportMsg.target ? reportMsg.target.tagName + "::" + reportMsg.target.src : "") : "";
@@ -587,7 +540,7 @@ var hunter = function (_report) {
 						breadcrumbs: JSON.stringify(_this2.breadcrumbs)
 					});
 				}
-				defaultOnerror.call(null, msg, url, line, col, error);
+				//defaultOnerror.call(null, msg, url, line, col, error);
 			};
 		}
 	}, {
@@ -598,9 +551,6 @@ var hunter = function (_report) {
 
 			var defaultUnhandledRejection = window.onunhandledrejection || utils.noop;
 			window.onunhandledrejection = function (error) {
-				if (!_this3.trigger('error', utils.toArray(_arguments2))) {
-					return false;
-				}
 
 				var msg = error.reason && error.reason.message || '';
 				var stackObj = {};
@@ -616,11 +566,11 @@ var hunter = function (_report) {
 						rowNum: stackObj.line || 0,
 						colNum: stackObj.col || 0,
 						targetUrl: stackObj.targetUrl || '',
-						level: 4,
+						level: 1,
 						breadcrumbs: JSON.stringify(_this3.breadcrumbs)
 					});
 				}
-				defaultUnhandledRejection.call(null, error);
+				//defaultUnhandledRejection.call(null, error);
 			};
 		}
 		//不存在stack的话，取调用栈信息

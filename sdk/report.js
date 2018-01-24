@@ -22,13 +22,16 @@ let Report = (supperclass) => class extends supperclass {
         // 合并上报
         let parames = curQueue.map( obj => {
             this.setItem( obj );
-            return utils.serializeObj( obj );
+            return utils.stringify( obj );
         } ).join( '|' );
+        console.log(parames)
         let url = this.url + parames;
         this.request( url, () => {
-            if ( cb ) {
-                cb.call( this );
-            }
+            console.log(this.errorQueue, 'queue')
+            this.removeEpires()
+            // if ( cb ) {
+            //     cb.call( this );
+            // }
         } );
         return url;
     }
@@ -37,7 +40,10 @@ let Report = (supperclass) => class extends supperclass {
         let rowNum = error.rowNum || '';
         let colNum = error.colNum || '';
         let repeatName = error.msg + rowNum + colNum;
+        //let allError = this.getItem(this.config.localKey);
         this.repeatList[ repeatName ] = this.repeatList[ repeatName ] ? this.repeatList[ repeatName ] + 1 : 1;
+        console.log(this.repeatList[ repeatName ], 'list')
+        console.log(this.config.repeat, 'repeat')
         return this.repeatList[ repeatName ] > this.config.repeat;
     }
 	// push错误到pool
@@ -101,6 +107,7 @@ let Report = (supperclass) => class extends supperclass {
             level: level
         };
         errorMsg = utils.assignObject( utils.getSystemInfo(), errorMsg );
+
         if ( this.catchError( errorMsg ) ) {
             this.send();
         }

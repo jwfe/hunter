@@ -11,10 +11,10 @@
 	<script src="http://cdn.bootcss.com/jquery/2.2.3/jquery.slim.js"></script>
 	<script src="dist/hunter.js"></script>
 	<script>
+		window.projectId = '123456';
 		var error_report = new hunter({
 		    url: 'http://192.168.19.201:9050/api/error.gif',
-		    repeat:5,
-		    delay: 3000
+		    delay: 1000
 		});
 		$('#error').click(function() {
 			console.log(aaa)

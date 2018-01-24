@@ -25,7 +25,7 @@ const store = {
         if ( errorObj ) {
             let name = store.getKey( errorObj );
             source[ name ] = {
-                value: errorObj,
+                value: errorObj.msg,
                 expiresTime: store.getEpires( validTime ),
             };
         }
@@ -59,6 +59,24 @@ const Storage = (supperclass) => class extends supperclass {
     }
     clear( key ) {
         store.clear( key );
+    }
+    //过期key删除
+    removeEpires () {
+        let _config = this.config;
+
+        let oData = store.getItem(_config.localKey) || {};
+
+        let date = +new Date();
+        for ( let key in oData ) {
+            if ( oData[ key ].expiresTime <= date ) {
+                delete oData[ key ];
+            }
+        }
+        this.clear(_config.localKey);
+
+        for(let newkey in oData) {
+            store.setItem(_config.localKey, {msg: oData[newkey].value}, _config.validTime);
+        }
     }
 }
 export default Storage;

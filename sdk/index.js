@@ -21,7 +21,7 @@ class hunter extends report(store(config)) {
 	      if (error && error.stack) {
 	        reportMsg = this.handleErrorStack(error);
 	      } else {
-	        reportMsg = this._fixMsgByCaller(reportMsg, arguments.callee.caller); // jshint ignore:line
+	        reportMsg = this._fixMsgByCaller(reportMsg, arguments.callee.caller); 
 	      }
 	      if (utils.typeDecide(reportMsg, "Event")) {
 	        reportMsg += reportMsg.type ?
@@ -38,15 +38,12 @@ class hunter extends report(store(config)) {
 	          breadcrumbs: JSON.stringify(this.breadcrumbs)
 	        });
 	      }
-	      defaultOnerror.call(null, msg, url, line, col, error);
+	      //defaultOnerror.call(null, msg, url, line, col, error);
 	    };
 	  }
 	  rewritePromiseError() {
 	      const defaultUnhandledRejection = window.onunhandledrejection || utils.noop;;
 	      window.onunhandledrejection = (error) => {
-	        if (!this.trigger('error', utils.toArray(arguments))) {
-	          return false;
-	        }
 
 	        let msg = error.reason && error.reason.message || '';
 	        let stackObj = {};
@@ -62,11 +59,11 @@ class hunter extends report(store(config)) {
 	            rowNum: stackObj.line || 0,
 	            colNum: stackObj.col || 0,
 	            targetUrl: stackObj.targetUrl || '',
-	            level: 4,
+	            level: 1,
 	            breadcrumbs: JSON.stringify(this.breadcrumbs)
 	          });
 	        }
-	        defaultUnhandledRejection.call(null, error);
+	        //defaultUnhandledRejection.call(null, error);
 	      }
 	    }
 	    //不存在stack的话，取调用栈信息
