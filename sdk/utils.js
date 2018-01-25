@@ -61,7 +61,7 @@ const utils = {
             title: document.title,
             screenSize: scr.width + "x" + scr.height,
             referer: document.referrer ? document.referrer.toLowerCase() : '',
-            project_id: window.projectId
+            project_id: window.hunter_projectId
         };
     },
     typeDecide: function ( o, type ) {

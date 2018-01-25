@@ -127,9 +127,7 @@ class hunter extends report(store(config)) {
 	  }
 	  _storeClcikedDom = (ele) => {
 	    const target = ele.target ? ele.target : ele.srcElement;
-	    let info = {
-	      time: new Date().getTime()
-	    };
+	    let info = {};
 	    if (target) {
 	      // 只保存存在的属性
 	      target.tagName && (info.tagName = target.tagName);

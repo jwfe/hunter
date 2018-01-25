@@ -150,7 +150,7 @@ var utils = {
             title: document.title,
             screenSize: scr.width + "x" + scr.height,
             referer: document.referrer ? document.referrer.toLowerCase() : '',
-            project_id: window.projectId
+            project_id: window.hunter_projectId
         };
     },
     typeDecide: function typeDecide(o, type) {
@@ -351,10 +351,8 @@ var Report$1 = function Report(supperclass) {
                     _this2.setItem(obj);
                     return utils.stringify(obj);
                 }).join('|');
-                console.log(parames);
                 var url = this.url + parames;
                 this.request(url, function () {
-                    console.log(_this2.errorQueue, 'queue');
                     _this2.removeEpires();
                     // if ( cb ) {
                     //     cb.call( this );
@@ -370,10 +368,7 @@ var Report$1 = function Report(supperclass) {
                 var rowNum = error.rowNum || '';
                 var colNum = error.colNum || '';
                 var repeatName = error.msg + rowNum + colNum;
-                //let allError = this.getItem(this.config.localKey);
                 this.repeatList[repeatName] = this.repeatList[repeatName] ? this.repeatList[repeatName] + 1 : 1;
-                console.log(this.repeatList[repeatName], 'list');
-                console.log(this.config.repeat, 'repeat');
                 return this.repeatList[repeatName] > this.config.repeat;
             }
             // push错误到pool
@@ -469,9 +464,7 @@ var hunter = function (_report) {
 
 		_this._storeClcikedDom = function (ele) {
 			var target = ele.target ? ele.target : ele.srcElement;
-			var info = {
-				time: new Date().getTime()
-			};
+			var info = {};
 			if (target) {
 				// 只保存存在的属性
 				target.tagName && (info.tagName = target.tagName);

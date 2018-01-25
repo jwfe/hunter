@@ -24,10 +24,8 @@ let Report = (supperclass) => class extends supperclass {
             this.setItem( obj );
             return utils.stringify( obj );
         } ).join( '|' );
-        console.log(parames)
         let url = this.url + parames;
         this.request( url, () => {
-            console.log(this.errorQueue, 'queue')
             this.removeEpires()
             // if ( cb ) {
             //     cb.call( this );
@@ -40,10 +38,7 @@ let Report = (supperclass) => class extends supperclass {
         let rowNum = error.rowNum || '';
         let colNum = error.colNum || '';
         let repeatName = error.msg + rowNum + colNum;
-        //let allError = this.getItem(this.config.localKey);
         this.repeatList[ repeatName ] = this.repeatList[ repeatName ] ? this.repeatList[ repeatName ] + 1 : 1;
-        console.log(this.repeatList[ repeatName ], 'list')
-        console.log(this.config.repeat, 'repeat')
         return this.repeatList[ repeatName ] > this.config.repeat;
     }
 	// push错误到pool
