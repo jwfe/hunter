@@ -81,6 +81,7 @@ let Report = (supperclass) => class extends supperclass {
     }
 	//手动上报
 	handle (msg, level) {
+
          if ( !msg ) {
             return false;
         }
@@ -101,8 +102,9 @@ let Report = (supperclass) => class extends supperclass {
             msg: msg,
             level: level
         };
-        errorMsg = utils.assignObject( utils.getSystemInfo(), errorMsg );
 
+        errorMsg = utils.assignObject( utils.getSystemInfo(), errorMsg );
+        
         if ( this.catchError( errorMsg ) ) {
             this.send();
         }

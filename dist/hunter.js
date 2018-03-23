@@ -150,7 +150,8 @@ var utils = {
             title: document.title,
             screenSize: scr.width + "x" + scr.height,
             referer: document.referrer ? document.referrer.toLowerCase() : '',
-            project_id: window.hunter_projectId
+            projectId: window.__hunter,
+            host: window.location.host
         };
     },
     typeDecide: function typeDecide(o, type) {
@@ -422,6 +423,7 @@ var Report$1 = function Report(supperclass) {
         }, {
             key: 'handle',
             value: function handle(msg, level) {
+
                 if (!msg) {
                     return false;
                 }
@@ -442,6 +444,7 @@ var Report$1 = function Report(supperclass) {
                     msg: msg,
                     level: level
                 };
+
                 errorMsg = utils.assignObject(utils.getSystemInfo(), errorMsg);
 
                 if (this.catchError(errorMsg)) {
