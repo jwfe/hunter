@@ -23,9 +23,9 @@ const store = {
         let source = store.getItem(key);
         
         if ( errorObj ) {
-            let name = store.getKey( errorObj );
+            let name = store.getKey( errorObj ) || 'bread';
             source[ name ] = {
-                value: errorObj.msg,
+                value: errorObj.msg || errorObj,
                 expiresTime: store.getEpires( validTime ),
             };
         }
@@ -51,11 +51,16 @@ const Storage = (supperclass) => class extends supperclass {
     getItem( key ) {
         return store.getItem( key );
     }
-    // 设置一条localstorage或cookie
+    // 设置一条localstorage
     setItem( errorObj ) {
         let _config = this.config;
         store.setItem( _config.localKey, errorObj,  _config.validTime );
         return utils.stringify( errorObj );
+    }
+    // 设置一条操作记录
+    setOpreat (breadcrumbs) {
+        let _config = this.config;
+        store.setItem( _config.localKey+'bread', breadcrumbs,  _config.validTime );
     }
     clear( key ) {
         store.clear( key );
@@ -72,11 +77,12 @@ const Storage = (supperclass) => class extends supperclass {
                 delete oData[ key ];
             }
         }
-        this.clear(_config.localKey);
+        this.clear();
 
         for(let newkey in oData) {
             store.setItem(_config.localKey, {msg: oData[newkey].value}, _config.validTime);
         }
+
     }
 }
 export default Storage;

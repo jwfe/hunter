@@ -33,7 +33,6 @@ class hunter extends report(store(config)) {
 	          msg: reportMsg,
 	          rowNum: line,
 	          colNum: col,
-	          targetUrl: url,
 	          level: 1,
 	          breadcrumbs: JSON.stringify(this.breadcrumbs)
 	        });
@@ -58,7 +57,6 @@ class hunter extends report(store(config)) {
 	            msg: msg,
 	            rowNum: stackObj.line || 0,
 	            colNum: stackObj.col || 0,
-	            targetUrl: stackObj.targetUrl || '',
 	            level: 1,
 	            breadcrumbs: JSON.stringify(this.breadcrumbs)
 	          });
@@ -89,7 +87,8 @@ class hunter extends report(store(config)) {
 	      const stackObj = {};
 	      const stackArr = stack.split('at');
 	      // 只取第一个堆栈信息，获取包含url、line、col的部分，如果有括号，去除最后的括号
-	      const info = stackArr[1].match(/http.*/)[0].replace(/\)$/, '');
+	      let infoStr = stackArr[1].match(/http.*/) || stackArr[2].match(/.js.*/);
+	      const info = infoStr[0].replace(/\)$/, '') || infoStr[0].replace(/\)$/, '');
 	      // 以冒号拆分
 	      const errorInfoArr = info.split(':');
 	      const len = errorInfoArr.length;
@@ -98,7 +97,6 @@ class hunter extends report(store(config)) {
 	      stackObj.line = errorInfoArr[len - 2];
 	      // 删除最后两个（行号、列号）
 	      errorInfoArr.splice(len - 2, 2);
-	      stackObj.targetUrl = errorInfoArr.join(':');
 	      return stackObj
 	    }
 	    // 处理onerror返回的error.stack
@@ -156,7 +154,9 @@ class hunter extends report(store(config)) {
 	      }
 	    }
 	    this.breadcrumbs.push(info);
-	    this.breadcrumbs.length > 10 && this.breadcrumbs.shift();
+			this.breadcrumbs.length > 10 && this.breadcrumbs.shift();
+			this.setOpreat(JSON.stringify(this.breadcrumbs))
+	    
 	  }
 }
 export default hunter;

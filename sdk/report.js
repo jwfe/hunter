@@ -82,27 +82,26 @@ let Report = (supperclass) => class extends supperclass {
 	//手动上报
 	handle (msg, level) {
 
-         if ( !msg ) {
+        if ( !msg ) {
             return false;
         }
         if( utils.typeDecide( msg, 'Object' ) && !msg.msg ){
             return false;
         }
-
         if ( utils.typeDecide( msg, 'Error' ) ) {
+            let key = this.config.localKey+'bread'
+            let msgInfo = this._parseErrorStack(msg.stack)
+            let breadcrumbs = this.getItem(key)
+            console.log(breadcrumbs)
             msg = {
-                msg: msg.message,
-                ext: {
-                    stack: msg.stack
-                }
+                msg: msg.stack,
+                colNum: msgInfo.col,
+                rowNum: msgInfo.line,
+                level: level,
+                breadcrumbs: breadcrumbs.bread.value
             };
         }
-
-        let errorMsg = utils.typeDecide( msg, 'Object' ) ? msg : {
-            msg: msg,
-            level: level
-        };
-
+        let errorMsg = msg;
         errorMsg = utils.assignObject( utils.getSystemInfo(), errorMsg );
         
         if ( this.catchError( errorMsg ) ) {
