@@ -27,9 +27,6 @@ let Report = (supperclass) => class extends supperclass {
         let url = this.url + parames;
         this.request( url, () => {
             this.removeEpires()
-            // if ( cb ) {
-            //     cb.call( this );
-            // }
         } );
         return url;
     }
@@ -92,7 +89,6 @@ let Report = (supperclass) => class extends supperclass {
             let key = this.config.localKey+'bread'
             let msgInfo = this._parseErrorStack(msg.stack)
             let breadcrumbs = this.getItem(key)
-            console.log(breadcrumbs)
             msg = {
                 msg: msg.stack,
                 colNum: msgInfo.col,
