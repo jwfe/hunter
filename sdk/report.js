@@ -90,6 +90,7 @@ let Report = (supperclass) => class extends supperclass {
             let msgInfo = this._parseErrorStack(msg.stack)
             let breadcrumbs = this.getItem(key)
             msg = {
+                projectId: this.config.projectId,
                 msg: msg.stack,
                 colNum: msgInfo.col,
                 rowNum: msgInfo.line,

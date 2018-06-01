@@ -1,2 +1,4 @@
-import hunter from './index';
-module.export = hunter;
+import index from './index';
+
+var hunter = new index()
+return hunter

@@ -1,3 +1,3 @@
-# hunter-server
+# hunter
 
 server for hunter

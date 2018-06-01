@@ -150,8 +150,8 @@ var utils = {
             title: document.title,
             screenSize: scr.width + "x" + scr.height,
             referer: document.referrer ? document.referrer.toLowerCase() : '',
-            projectId: window.__hunter,
-            host: window.location.host
+            host: window.location.host,
+            targetUrl: window.location.href
         };
     },
     typeDecide: function typeDecide(o, type) {
@@ -171,6 +171,13 @@ var utils = {
         });
         return encodeURIComponent(parames.substr(0, parames.length - 1));
     },
+    each: function each(arr) {
+        var obj = {};
+        arr.forEach(function (item) {
+            obj[item[0]] = item[1];
+        });
+        return obj;
+    },
     //空回调
     noop: function noop() {}
 };
@@ -179,17 +186,20 @@ var utils = {
 * @ config 用户配置
 */
 var Config = function () {
-	function Config(options) {
+	function Config() {
 		classCallCheck(this, Config);
 
 		this.config = {
 			localKey: 'hunter',
-			url: 'http://192.168.19.201:9050/api/error.gif', //上报错误地址
+			url: 'http://192.168.19.201:9051/api/error.gif', //上报错误地址
 			except: [/^Script error\.?/, /^Javascript error: Script error\.? on line 0/], // 忽略某个错误
 			delay: 3000, //延迟上报时间
 			repeat: 1, //重复2次不上报
 			validTime: 7 //localstorage过期时间
 		};
+
+		var options = utils.each(window['Hunter_Tags']);
+
 		this.config = utils.assignObject(this.config, options);
 	}
 
@@ -231,9 +241,9 @@ var store = {
         var source = store.getItem(key);
 
         if (errorObj) {
-            var name = store.getKey(errorObj);
+            var name = store.getKey(errorObj) || 'bread';
             source[name] = {
-                value: errorObj.msg,
+                value: errorObj.msg || errorObj,
                 expiresTime: store.getEpires(validTime)
             };
         }
@@ -274,7 +284,7 @@ var Storage$1 = function Storage(supperclass) {
             value: function getItem(key) {
                 return store.getItem(key);
             }
-            // 设置一条localstorage或cookie
+            // 设置一条localstorage
 
         }, {
             key: "setItem",
@@ -282,6 +292,14 @@ var Storage$1 = function Storage(supperclass) {
                 var _config = this.config;
                 store.setItem(_config.localKey, errorObj, _config.validTime);
                 return utils.stringify(errorObj);
+            }
+            // 设置一条操作记录
+
+        }, {
+            key: "setOpreat",
+            value: function setOpreat(breadcrumbs) {
+                var _config = this.config;
+                store.setItem(_config.localKey + 'bread', breadcrumbs, _config.validTime);
             }
         }, {
             key: "clear",
@@ -303,7 +321,7 @@ var Storage$1 = function Storage(supperclass) {
                         delete oData[key];
                     }
                 }
-                this.clear(_config.localKey);
+                this.clear();
 
                 for (var newkey in oData) {
                     store.setItem(_config.localKey, { msg: oData[newkey].value }, _config.validTime);
@@ -355,9 +373,6 @@ var Report$1 = function Report(supperclass) {
                 var url = this.url + parames;
                 this.request(url, function () {
                     _this2.removeEpires();
-                    // if ( cb ) {
-                    //     cb.call( this );
-                    // }
                 });
                 return url;
             }
@@ -430,21 +445,20 @@ var Report$1 = function Report(supperclass) {
                 if (utils.typeDecide(msg, 'Object') && !msg.msg) {
                     return false;
                 }
-
                 if (utils.typeDecide(msg, 'Error')) {
+                    var key = this.config.localKey + 'bread';
+                    var msgInfo = this._parseErrorStack(msg.stack);
+                    var breadcrumbs = this.getItem(key);
                     msg = {
-                        msg: msg.message,
-                        ext: {
-                            stack: msg.stack
-                        }
+                        projectId: this.config.projectId,
+                        msg: msg.stack,
+                        colNum: msgInfo.col,
+                        rowNum: msgInfo.line,
+                        level: level,
+                        breadcrumbs: breadcrumbs.bread.value
                     };
                 }
-
-                var errorMsg = utils.typeDecide(msg, 'Object') ? msg : {
-                    msg: msg,
-                    level: level
-                };
-
+                var errorMsg = msg;
                 errorMsg = utils.assignObject(utils.getSystemInfo(), errorMsg);
 
                 if (this.catchError(errorMsg)) {
@@ -497,6 +511,7 @@ var hunter = function (_report) {
 			}
 			_this.breadcrumbs.push(info);
 			_this.breadcrumbs.length > 10 && _this.breadcrumbs.shift();
+			_this.setOpreat(JSON.stringify(_this.breadcrumbs));
 		};
 
 		_this.breadcrumbs = [];
@@ -531,7 +546,6 @@ var hunter = function (_report) {
 						msg: reportMsg,
 						rowNum: line,
 						colNum: col,
-						targetUrl: url,
 						level: 1,
 						breadcrumbs: JSON.stringify(_this2.breadcrumbs)
 					});
@@ -561,7 +575,6 @@ var hunter = function (_report) {
 						msg: msg,
 						rowNum: stackObj.line || 0,
 						colNum: stackObj.col || 0,
-						targetUrl: stackObj.targetUrl || '',
 						level: 1,
 						breadcrumbs: JSON.stringify(_this3.breadcrumbs)
 					});
@@ -598,7 +611,8 @@ var hunter = function (_report) {
 			var stackObj = {};
 			var stackArr = stack.split('at');
 			// 只取第一个堆栈信息，获取包含url、line、col的部分，如果有括号，去除最后的括号
-			var info = stackArr[1].match(/http.*/)[0].replace(/\)$/, '');
+			var infoStr = stackArr[1].match(/http.*/) || stackArr[2].match(/.js.*/);
+			var info = infoStr[0].replace(/\)$/, '') || infoStr[0].replace(/\)$/, '');
 			// 以冒号拆分
 			var errorInfoArr = info.split(':');
 			var len = errorInfoArr.length;
@@ -607,7 +621,6 @@ var hunter = function (_report) {
 			stackObj.line = errorInfoArr[len - 2];
 			// 删除最后两个（行号、列号）
 			errorInfoArr.splice(len - 2, 2);
-			stackObj.targetUrl = errorInfoArr.join(':');
 			return stackObj;
 		}
 		// 处理onerror返回的error.stack
@@ -643,6 +656,8 @@ var hunter = function (_report) {
 	return hunter;
 }(Report$1(Storage$1(Config)));
 
-return hunter;
+var newHunter = new hunter();
+
+return newHunter;
 
 })));

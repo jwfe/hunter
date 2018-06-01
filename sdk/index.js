@@ -159,4 +159,5 @@ class hunter extends report(store(config)) {
 	    
 	  }
 }
-export default hunter;
+var newHunter = new hunter()
+export default newHunter;

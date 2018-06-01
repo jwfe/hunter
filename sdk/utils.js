@@ -61,7 +61,6 @@ const utils = {
             title: document.title,
             screenSize: scr.width + "x" + scr.height,
             referer: document.referrer ? document.referrer.toLowerCase() : '',
-            projectId: window.__hunter,
             host: window.location.host,
             targetUrl: window.location.href
         };
@@ -82,6 +81,13 @@ const utils = {
            }
         } );
         return encodeURIComponent( parames.substr( 0, parames.length - 1 ) );
+    },
+    each: function (arr) {
+        let obj = {}
+        arr.forEach((item) => {
+            obj[item[0]] = item[1]
+        })
+        return obj
     },
     //空回调
     noop: function () {}
